@@ -46,6 +46,7 @@ end
 ---@field Id NpcId The ID of the NPC
 ---@field Waypoints table<AreaId, CoordPair[]>
 ---@field Hostile true|boolean
+---@field IsRare true? A rare or rare elite: blob mode leaves it out where its objective has common targets.
 
 ---@class SpawnListItem : SpawnListBase, SpawnListTooltip, SpawnListNPC
 ---@field Id ObjectId|NpcId The ID of the Object or Npc
@@ -114,6 +115,8 @@ monster = function(npcId, objective)
         Spawns = enableSpawns and spawns or {},
         Waypoints = enableWaypoints and QuestieDB.QueryNPCSingle(npcId, "waypoints") or {},
         Hostile = true,
+        -- Ranks follow cmangos' creature_template: 2 is rare elite, 4 rare.
+        IsRare = (rank == 2 or rank == 4) or nil,
         Icon = objective.Icon or Questie.ICON_TYPE_SLAY,
         GetIconScale = _GetIconScaleForMonster,
         IconScale = _GetIconScaleForMonster(),
@@ -238,6 +241,7 @@ item = function(itemId, objective)
                                 Name = sourceData.Name,
                                 -- Monsters dropping the item are fought; objects holding it are not.
                                 Hostile = sourceData.Hostile,
+                                IsRare = sourceData.IsRare,
                                 ItemId = item.Id,
                                 TooltipKey = sourceData.TooltipKey,
                                 Spawns = {},
