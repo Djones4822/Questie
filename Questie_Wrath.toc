@@ -207,6 +207,7 @@ Modules\Map\Waypoints\WaypointMinimap.lua
 
 # Quest
 Modules\Quest\AvailableQuests\IsLevelRequirementFulfilled.lua
+Modules\Quest\AvailableQuests\QuestChainFilter.lua
 Modules\Quest\AvailableQuests\AvailableQuests.lua
 Modules\Quest\QuestLogCache.lua
 Modules\Quest\ActiveQuests.lua

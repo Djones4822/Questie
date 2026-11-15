@@ -452,6 +452,30 @@ function QuestieOptions.tabs.general:Initialize()
                             end, "maxLevelFilter set to " .. value)
                         end,
                     },
+                    showLevelAppropriatePrerequisites = {
+                        type = "toggle",
+                        order = 3.4,
+                        name = function() return l10n("Show prerequisites for level-appropriate quests") end,
+                        desc = function() return l10n("Keep low-level quests visible when they lead to quests within your configured level range.") end,
+                        width = "full",
+                        get = function() return Questie.db.profile.showLevelAppropriatePrerequisites end,
+                        set = function(_, value)
+                            Questie.db.profile.showLevelAppropriatePrerequisites = value
+                            AvailableQuests.CalculateAndDrawAll()
+                        end,
+                    },
+                    showDungeonQuestChains = {
+                        type = "toggle",
+                        order = 3.5,
+                        name = function() return l10n("Show dungeon quest chains") end,
+                        desc = function() return l10n("Keep low-level prerequisites for dungeon quests visible, regardless of level. Requires dungeon quest visibility.") end,
+                        width = "full",
+                        get = function() return Questie.db.profile.showDungeonQuestChains end,
+                        set = function(_, value)
+                            Questie.db.profile.showDungeonQuestChains = value
+                            AvailableQuests.CalculateAndDrawAll()
+                        end,
+                    },
                 },
             },
             tooltip_spacer = QuestieOptionsUtils:Spacer(4.5, nil, "minimal"),

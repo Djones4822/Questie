@@ -57,6 +57,65 @@ describe("QuestieDB", function()
         }
     end)
 
+    describe("IsChainEligible", function()
+        local row, active
+        before_each(function()
+            row, active = {preQuestSingle = {10}}, {}
+            Questie.db.char.hidden = {}
+            QuestieLib.TableMemoizeFunction = function(_, fn)
+                return setmetatable({}, {__index = function(_, key) return fn(key) end})
+            end
+            QuestiePlayer.HasRequiredRace = function(mask) return mask ~= 999 end
+            QuestiePlayer.HasRequiredClass = function(mask) return mask ~= 999 end
+            QuestieLoader:ImportModule("ActiveQuests").GetAll = function() return active end
+            QuestieLoader:ImportModule("DailyQuests").ShouldBeHidden = function() return false end
+            QuestieLoader:ImportModule("ContentPhases").IsInvasionActive = {}
+            QuestieLoader:ImportModule("QuestieQuestBlacklist").InvasionQuests = {}
+            QuestieLoader:ImportModule("QuestieProfessions").HasProfessionAndSkillLevel = function() return false, false end
+            QuestieDB.private.CheckAchievementRequirements = function() return true end
+            QuestieDB.Initialize()
+            QuestieDB.QueryQuestSingle = function(_, field) return row[field] end
+        end)
+        it("defers prerequisites while ordinary availability still requires completion", function()
+            assert.is_false(QuestieDB.IsDoable(20))
+            assert.is_true(QuestieDB.IsChainEligible(20))
+            Questie.db.char.complete[10] = true
+            assert.is_true(QuestieDB.IsDoable(20))
+            row.preQuestSingle, row.preQuestGroup = nil, {11}
+            assert.is_false(QuestieDB.IsDoable(20))
+            assert.is_true(QuestieDB.IsChainEligible(20))
+        end)
+        it("retains race, class, profession, hidden, completion, and exclusion checks", function()
+            for _, field in ipairs({"requiredRaces", "requiredClasses", "requiredSkill"}) do
+                row[field] = 999
+                assert.is_false(QuestieDB.IsChainEligible(20))
+                row[field] = nil
+            end
+            Questie.db.char.hidden[20] = true
+            assert.is_false(QuestieDB.IsChainEligible(20))
+            Questie.db.char.hidden[20] = nil
+            Questie.db.char.complete[20] = true
+            assert.is_false(QuestieDB.IsChainEligible(20))
+            Questie.db.char.complete[20] = nil
+            row.exclusiveTo, active[30] = {30}, true
+            assert.is_false(QuestieDB.IsChainEligible(20))
+        end)
+        it("does not relax active-parent and availability-boundary restrictions", function()
+            for _, field in ipairs({"parentQuest", "availableStartingWith"}) do
+                row[field] = 10
+                assert.is_false(QuestieDB.IsChainEligible(20))
+                row[field] = nil
+            end
+            row.availableUntilCompleted, Questie.db.char.complete[10] = 10, true
+            assert.is_false(QuestieDB.IsChainEligible(20))
+        end)
+        it("increments the graph revision for corrections with unchanged IDs", function()
+            local revision = QuestieDB.questDataRevision
+            QuestieDB.RefreshAfterCorrectionApply("Quest", {})
+            assert.are_same(revision + 1, QuestieDB.questDataRevision)
+        end)
+    end)
+
     describe("raceKeys", function()
         it("binds the provider's active faction masks without selecting a flavor again", function()
             mock.lib.Enum.factionRaceMasks = {Alliance = 4294967373, Horde = 8589934770}

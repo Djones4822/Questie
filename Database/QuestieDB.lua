@@ -285,6 +285,7 @@ function QuestieDB.Initialize()
     _QuestieDB.InitializeQuestTagInfoCorrections()
 
     _BindEntityIdMaps()
+    QuestieDB.questDataRevision = (QuestieDB.questDataRevision or 0) + 1
     -- Anything that reached the API before Login Initialization saw an uncorrected view. No quest
     -- lifecycle state exists yet, so quest objects are dropped along with the entity caches.
     _QuestieDB.questCache = {}
@@ -314,6 +315,7 @@ end
 ---@return nil
 function QuestieDB.RefreshAfterCorrectionApply(datatype, changedIds)
     if datatype == "Quest" then
+        QuestieDB.questDataRevision = (QuestieDB.questDataRevision or 0) + 1
         QuestieDB.QuestPointers = LibQuestieDB.Quest.GetAllIds(true)
         for questId in pairs(changedIds) do
             _QuestieDB.questCache[questId] = nil
@@ -692,7 +694,7 @@ end
 ---@param questId number
 ---@param debugPrint boolean? -- if true, IsDoable will print conclusions to debug channel
 ---@return boolean
-function QuestieDB.IsDoable(questId, debugPrint)
+local function _IsDoable(questId, debugPrint, ignorePrerequisites)
 
     --!  Before changing any logic in QuestieDB.IsDoable, make sure
     --!  to mirror the same logic to QuestieDB.IsDoableVerbose!
@@ -739,7 +741,7 @@ function QuestieDB.IsDoable(questId, debugPrint)
 
     -- Check the preQuestSingle field where just one of the required quests has to be complete for a quest to show up
     local preQuestSingle = QuestieDB.QueryQuestSingle(questId, "preQuestSingle")
-    if preQuestSingle then
+    if preQuestSingle and not ignorePrerequisites then
         local isPreQuestSingleFulfilled = QuestieDB:IsPreQuestSingleFulfilled(preQuestSingle)
         if not isPreQuestSingleFulfilled then
             if debugPrint then Questie.Debug(Questie.DEBUG_SPAM, "[QuestieDB.IsDoable] Pre-quest requirement not fulfilled for quest " .. questId) end
@@ -809,7 +811,7 @@ function QuestieDB.IsDoable(questId, debugPrint)
 
     --? preQuestGroup and preQuestSingle are mutualy exclusive to eachother and preQuestSingle is more prevalent
     --? Only try group if single does not exist.
-    if not preQuestSingle then
+    if not preQuestSingle and not ignorePrerequisites then
         -- Check the preQuestGroup field where every required quest has to be complete for a quest to show up
         local preQuestGroup = QuestieDB.QueryQuestSingle(questId, "preQuestGroup")
         if preQuestGroup then
@@ -957,6 +959,19 @@ function QuestieDB.IsDoable(questId, debugPrint)
     end
 
     return true
+end
+
+--- Current availability, including completed prerequisites.
+function QuestieDB.IsDoable(questId, debugPrint)
+    return _IsDoable(questId, debugPrint, false)
+end
+
+--- Eligibility for a prospective chain target. Only completed-prerequisite checks are deferred
+--- to the chain evaluator; all other restrictions still apply, including active-parent requirements.
+---@param questId QuestId
+---@return boolean
+function QuestieDB.IsChainEligible(questId)
+    return _IsDoable(questId, false, true)
 end
 
 ---@param questId number

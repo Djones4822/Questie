@@ -138,6 +138,8 @@ function QuestieOptionsDefaults:Load()
 
             lowLevelStyle = 1, -- Questie.LOWLEVEL_NONE
             manualLevelOffset = 7,
+            showLevelAppropriatePrerequisites = false,
+            showDungeonQuestChains = false,
             minLevelFilter = 1,
             maxLevelFilter = 10,
             enabled = true,

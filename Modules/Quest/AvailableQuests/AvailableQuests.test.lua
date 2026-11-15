@@ -1928,9 +1928,31 @@ describe("AvailableQuests", function()
         end)
 
         after_each(function()
+            Questie.db.profile.showLevelAppropriatePrerequisites = false
+            Questie.db.profile.showDungeonQuestChains = false
             Questie.IsClassic = originalIsClassic
             Questie.IsSoD = originalIsSoD
             QuestieMap.GetFramesForQuest = originalGetFramesForQuest
+        end)
+
+        it("passes chain protection only through the level check and retains ordinary eligibility", function()
+            local filter = QuestieLoader:ImportModule("QuestChainFilter")
+            filter.Calculate = spy.new(function() end)
+            filter.GetReason = function() return "level" end
+            Questie.db.profile.showLevelAppropriatePrerequisites = true
+            Questie.db.profile.showDungeonQuestChains = false
+            QuestieDB.IsDoable = function(id) return id ~= 3 end
+            local checkLevel = spy.new(function(_, _, _, _, keep) return keep == true end)
+            AvailableQuests.IsLevelRequirementsFulfilled = checkLevel
+            dofile("Modules/Quest/AvailableQuests/AvailableQuests.lua")
+            AvailableQuests = QuestieLoader:ImportModule("AvailableQuests")
+            AvailableQuests.Initialize()
+            AvailableQuests.CalculateAndDrawAll()
+            submittedJobs[1].threadFunction()
+            assert.are_same({[2] = true}, AvailableQuests.__availableQuests)
+            assert.spy(filter.Calculate).was.called(1)
+            assert.spy(checkLevel).was.called_with(2, match._, match._, 60, true)
+            Questie.db.profile.showLevelAppropriatePrerequisites = false
         end)
 
         it("marks every doable Quest from the provider-backed QuestPointers as available", function()

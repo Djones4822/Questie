@@ -31,6 +31,9 @@ local DailyQuestComms = QuestieLoader:ImportModule("DailyQuestComms")
 ---@type DailyQuestCommsBlacklist
 local DailyQuestCommsBlacklist = QuestieLoader:ImportModule("DailyQuestCommsBlacklist")
 
+---@type QuestChainFilter
+local QuestChainFilter = QuestieLoader:ImportModule("QuestChainFilter")
+
 local GetQuestGreenRange = QuestieCompat.GetQuestGreenRange
 local yield = coroutine.yield
 local tinsert = table.insert
@@ -580,6 +583,32 @@ _CalculateAndDrawAvailableQuests = function()
     local IsClassic = Questie.IsClassic
     local IsSoD = Questie.IsSoD
 
+    local function _IsCategoryHidden(questId)
+        return (
+                ((not showRepeatableQuests) and QuestieDB.IsRepeatable(questId)) or -- Don't show repeatable quests if option is disabled
+                ((not showPvPQuests) and QuestieDB.IsPvPQuest(questId)) or -- Don't show PvP quests if option is disabled
+                ((not showDungeonQuests) and QuestieDB.IsDungeonQuest(questId)) or -- Don't show dungeon quests if option is disabled
+                ((not showRaidQuests) and QuestieDB.IsRaidQuest(questId)) or -- Don't show raid quests if option is disabled
+                ((not showAQWarEffortQuests) and aqWarEffortQuests[questId]) or -- Don't show AQ War Effort quests if the option disabled
+                (IsClassic and currentIsleOfQuelDanasQuests[questId]) or -- Don't show Isle of Quel'Danas quests for Era/HC/SoX
+                (IsSoD and QuestieDB.IsRuneAndShouldBeHidden(questId)) -- Don't show SoD Rune quests with the option disabled
+            )
+    end
+
+    if Questie.db.profile.showLevelAppropriatePrerequisites or Questie.db.profile.showDungeonQuestChains then
+        QuestChainFilter.Calculate(questIds, completedQuests, activeQuests, function(questId)
+            return not (autoBlacklist[questId] or hiddenQuests[questId] or hidden[questId]
+                or unavailableQuestsDeterminedByTalking[questId] or _IsCategoryHidden(questId))
+                and QuestieDB.IsChainEligible(questId)
+                and IsLevelRequirementsFulfilled(questId, 0, math.huge, playerLevel, true)
+        end, function(questId)
+            local level = Questie.db.profile.showLevelAppropriatePrerequisites
+                and IsLevelRequirementsFulfilled(questId, minLevel, maxLevel, playerLevel)
+            local dungeon = Questie.db.profile.showDungeonQuestChains and showDungeonQuests and QuestieDB.IsDungeonQuest(questId)
+            return level, dungeon
+        end, yield)
+    end
+
     -- We create a local function here to improve readability but use the localized variables above.
     -- The order of checks is important here to bring the speed to a max
     local questsToRemove = {}
@@ -593,15 +622,7 @@ _CalculateAndDrawAvailableQuests = function()
             end
         end
 
-        if (
-                ((not showRepeatableQuests) and QuestieDB.IsRepeatable(questId)) or -- Don't show repeatable quests if option is disabled
-                ((not showPvPQuests) and QuestieDB.IsPvPQuest(questId)) or -- Don't show PvP quests if option is disabled
-                ((not showDungeonQuests) and QuestieDB.IsDungeonQuest(questId)) or -- Don't show dungeon quests if option is disabled
-                ((not showRaidQuests) and QuestieDB.IsRaidQuest(questId)) or -- Don't show raid quests if option is disabled
-                ((not showAQWarEffortQuests) and aqWarEffortQuests[questId]) or -- Don't show AQ War Effort quests if the option disabled
-                (IsClassic and currentIsleOfQuelDanasQuests[questId]) or -- Don't show Isle of Quel'Danas quests for Era/HC/SoX
-                (IsSoD and QuestieDB.IsRuneAndShouldBeHidden(questId)) -- Don't show SoD Rune quests with the option disabled
-            ) then
+        if _IsCategoryHidden(questId) then
             if availableQuests[questId] then
                 questsToRemove[#questsToRemove + 1] = questId
             end
@@ -609,7 +630,10 @@ _CalculateAndDrawAvailableQuests = function()
             return
         end
 
-        if ((not IsLevelRequirementsFulfilled(questId, minLevel, maxLevel, playerLevel)) or (not IsDoable(questId, debugEnabled))) then
+        local keepChain = (Questie.db.profile.showLevelAppropriatePrerequisites or Questie.db.profile.showDungeonQuestChains)
+            and QuestChainFilter.GetReason(questId) ~= "none"
+        if ((not IsLevelRequirementsFulfilled(questId, minLevel, maxLevel, playerLevel, keepChain))
+            or (not IsDoable(questId, debugEnabled))) then
             --If the quests are not within level range we want to unload them
             --(This is for when people level up or change settings etc)
 
